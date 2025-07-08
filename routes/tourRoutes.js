@@ -1,14 +1,26 @@
 const express = require("express");
 const tourController = require("./../controllers/tourController");
+
 const router = express.Router();
 
-router.param("id", tourController.checkID);
+// Top 5 cheap tours
+router
+  .route("/top-5-cheap")
+  .get(tourController.aliasTopTours, tourController.getAllTours);
 
+// Tour statistics
+router.route("/tour-stats").get(tourController.getTourStats);
+
+// Monthly plan — must be defined before `/:id`
+router.route("/monthly-plan/:year").get(tourController.getMonthlyPlan);
+
+// Get all tours, Create a new tour
 router
   .route("/")
   .get(tourController.getAllTours)
-  .post(tourController.checkBody, tourController.createTour);
+  .post(tourController.createTour);
 
+// This must come last — handles routes like `/tours/:id`
 router
   .route("/:id")
   .get(tourController.getTour)
