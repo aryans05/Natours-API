@@ -1,5 +1,5 @@
 const express = require("express");
-const tourController = require("./../controllers/tourController");
+const tourController = require("../controllers/tourController");
 
 const router = express.Router();
 
@@ -12,7 +12,9 @@ router
 router.route("/tour-stats").get(tourController.getTourStats);
 
 // Monthly plan — must be defined before `/:id`
-router.route("/monthly-plan/:year").get(tourController.getMonthlyPlan);
+router
+  .route("/monthly-plan/:year") // ✅ fixed: added `year` parameter
+  .get(tourController.getMonthlyPlan);
 
 // Get all tours, Create a new tour
 router
@@ -20,7 +22,7 @@ router
   .get(tourController.getAllTours)
   .post(tourController.createTour);
 
-// This must come last — handles routes like `/tours/:id`
+// Handle single tour by ID
 router
   .route("/:id")
   .get(tourController.getTour)

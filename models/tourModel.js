@@ -1,21 +1,23 @@
 const mongoose = require("mongoose");
 const slugify = require("slugify");
-const validator = require("validator");
+// const validator = require("validator"); // Optional, unused currently
 
 const tourSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: [true, "A tour must have name"],
+      required: [true, "A tour must have a name"],
       unique: true,
-      maxlength: [40, "A tour must have less or equalthan 40 characters"],
-      minlength: [10, "A tour must have less or equalthan 10 characters"],
-      //    validate: [validator.isAlpha, "Tour Name Must Only Contain Characters"],
+      maxlength: [40, "A tour name must have less or equal than 40 characters"],
+      minlength: [10, "A tour name must have more or equal than 10 characters"],
+      // validate: [validator.isAlpha, "Tour name must only contain characters"]
     },
+
     slug: String,
+
     duration: {
       type: Number,
-      required: [true, "A tour must have duration"],
+      required: [true, "A tour must have a duration"],
     },
 
     ratingAverage: {
@@ -32,33 +34,40 @@ const tourSchema = new mongoose.Schema(
 
     maxGroupSize: {
       type: Number,
-      required: [true, "A tour must have required group size"],
+      required: [true, "A tour must have a group size"],
     },
 
     difficulty: {
       type: String,
-      required: [true, "A tour must have difficulty"],
-      enum: ["easy", "medium", "difficult"],
-      message: "Difficulty is either: easy, medium , difficult",
+      required: [true, "A tour must have a difficulty"],
+      enum: {
+        values: ["easy", "medium", "difficult"],
+        message: "Difficulty is either: easy, medium, or difficult",
+      },
     },
+
     price: {
       type: Number,
-      required: [true, "A tour must have price"],
+      required: [true, "A tour must have a price"],
     },
+
     priceDiscount: {
       type: Number,
       validate: {
-        // This only point to current document so it will not update
         validator: function (val) {
+          // Only works on CREATE and SAVE
           return val < this.price;
         },
         message: "Discount price ({VALUE}) should be below regular price",
       },
     },
+
     summary: {
       type: String,
-      trim: [true, "A tour must have description"],
+      trim: true,
+      required: [true, "A tour must have a summary"],
     },
+
     description: {
       type: String,
       trim: true,
@@ -66,9 +75,11 @@ const tourSchema = new mongoose.Schema(
 
     imageCover: {
       type: String,
-      required: [true, "A tour must have the cover image"],
+      required: [true, "A tour must have a cover image"],
     },
+
     images: [String],
+
     createdAt: {
       type: Date,
       default: Date.now,
@@ -88,44 +99,32 @@ const tourSchema = new mongoose.Schema(
   }
 );
 
-tourSchema.virtual("durationsWeeks").get(function () {
+// Virtual property
+tourSchema.virtual("durationWeeks").get(function () {
   return this.duration / 7;
 });
 
-// Document Middleware : runs before .save() and .create() .insertMany()
-
+// Document middleware: runs before .save() and .create()
 tourSchema.pre("save", function (next) {
   this.slug = slugify(this.name, { lower: true });
   next();
 });
 
-// tourSchema.pre("save", function (next) {
-//   console.log("will save document ");
-//   next();
-// });
-
-// tourSchema.post("save", function (doc, next) {
-//   console.log(doc);
-//   next();
-// });
-
-//Query Middleware
-
-tourSchema.pre("find", function (next) {
+// Query middleware: filters out secret tours
+tourSchema.pre(/^find/, function (next) {
   this.find({ secretTour: { $ne: true } });
-
   this.start = Date.now();
   next();
 });
 
 tourSchema.post(/^find/, function (docs, next) {
-  console.log(`Query took ${Date.now() - this.start}milliseconds!`);
+  console.log(`Query took ${Date.now() - this.start} milliseconds!`);
+  next();
 });
 
-// Aggregation Middleware
-
+// Aggregation middleware: exclude secret tours from aggregations
 tourSchema.pre("aggregate", function (next) {
-  this.pipeline().unshift({ match: { secretTour: { $ne: true } } });
+  this.pipeline().unshift({ $match: { secretTour: { $ne: true } } });
   console.log(this.pipeline());
   next();
 });
