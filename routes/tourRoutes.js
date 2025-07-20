@@ -1,33 +1,57 @@
 const express = require("express");
 const tourController = require("../controllers/tourController");
 const authController = require("../controllers/authController");
+const reviewRouter = require("./../routes/reviewRoutes");
 
 const router = express.Router();
 
-// Top 5 cheap tours
+// ✅ Nested routes: Forward requests to /:tourId/reviews to reviewRouter
+router.use("/:tourId/reviews", reviewRouter);
+
+// ✅ Route for top 5 cheap tours
 router
   .route("/top-5-cheap")
   .get(tourController.aliasTopTours, tourController.getAllTours);
 
-// Tour statistics
+// ✅ Route for tour statistics
 router.route("/tour-stats").get(tourController.getTourStats);
 
-// Monthly plan — must be defined before `/:id`
+// ✅ Route for monthly plan (protected & role-restricted)
 router
-  .route("/monthly-plan/:year") // ✅ fixed: added `year` parameter
-  .get(tourController.getMonthlyPlan);
+  .route("/monthly-plan/:year")
+  .get(
+    authController.protect,
+    authController.restrictTo("admin", "lead-guide", "guide"),
+    tourController.getMonthlyPlan
+  );
 
-// Get all tours, Create a new tour
+// ✅ Route for geospatial query: tours within a distance
+// Example: /tours-within/233/center/30.687345644629364,76.66452903912155/unit/mi
+router
+  .route("/tours-within/:distance/center/:latlng/unit/:unit")
+  .get(tourController.getToursWithin);
+
+router.route("/distance/:latlng/unit/:unit").get(tourController.getDistances);
+
+// ✅ Main routes for tours
 router
   .route("/")
-  .get(authController.protect, tourController.getAllTours)
-  .post(tourController.createTour);
+  .get(tourController.getAllTours)
+  .post(
+    authController.protect,
+    authController.restrictTo("admin", "lead-guide"),
+    tourController.createTour
+  );
 
-// Handle single tour by ID
+// ✅ Single tour routes (by ID)
 router
   .route("/:id")
   .get(tourController.getTour)
-  .patch(tourController.UpdateTour)
+  .patch(
+    authController.protect,
+    authController.restrictTo("admin", "lead-guide"),
+    tourController.updateTour
+  )
   .delete(
     authController.protect,
     authController.restrictTo("admin", "lead-guide"),

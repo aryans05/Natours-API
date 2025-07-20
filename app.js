@@ -4,7 +4,8 @@ const AppError = require("./utils/appError");
 const rateLimit = require("express-rate-limit");
 const helmet = require("helmet");
 const globalErrorHandler = require("./utils/globalErrorHandler");
-const mongoSanatize = require("express-mongo-sanitize");
+const reviewRouter = require("./routes/reviewRoutes");
+
 const hpp = require("hpp");
 
 const tourRouter = require("./routes/tourRoutes");
@@ -28,7 +29,26 @@ const limiter = rateLimit({
 app.use("/api", limiter);
 
 // Data sanitization against no sql query injection
-app.use(mongoSanatize());
+const mongoSanitize = (req, res, next) => {
+  const sanitize = (obj) => {
+    for (const key in obj) {
+      if (key.startsWith("$") || key.includes(".")) {
+        delete obj[key];
+      } else if (typeof obj[key] === "object" && obj[key] !== null) {
+        sanitize(obj[key]);
+      }
+    }
+  };
+
+  sanitize(req.body);
+  sanitize(req.query);
+  sanitize(req.params);
+
+  next();
+};
+
+app.use(mongoSanitize);
+
 // Data sanitization against xss
 
 // Prevent Paremeter Pollution
@@ -54,6 +74,7 @@ app.use((req, res, next) => {
 // 2. ROUTES
 app.use("/api/v1/tours", tourRouter);
 app.use("/api/v1/users", userRouter);
+app.use("/api/v1/reviews", reviewRouter);
 
 // 3. UNHANDLED ROUTES
 

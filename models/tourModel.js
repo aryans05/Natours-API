@@ -1,7 +1,8 @@
 const mongoose = require("mongoose");
 const slugify = require("slugify");
-// const validator = require("validator"); // Optional, unused currently
+const User = require("./userModel"); // Ensure the path is correct
 
+// Define schema
 const tourSchema = new mongoose.Schema(
   {
     name: {
@@ -10,7 +11,7 @@ const tourSchema = new mongoose.Schema(
       unique: true,
       maxlength: [40, "A tour name must have less or equal than 40 characters"],
       minlength: [10, "A tour name must have more or equal than 10 characters"],
-      // validate: [validator.isAlpha, "Tour name must only contain characters"]
+      // validate: [validator.isAlpha, 'Name must only contain letters'] // optional
     },
 
     slug: String,
@@ -55,7 +56,6 @@ const tourSchema = new mongoose.Schema(
       type: Number,
       validate: {
         validator: function (val) {
-          // Only works on CREATE and SAVE
           return val < this.price;
         },
         message: "Discount price ({VALUE}) should be below regular price",
@@ -92,6 +92,39 @@ const tourSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+
+    // Embed multiple guides by reference
+    guides: [
+      {
+        type: mongoose.Schema.ObjectId,
+        ref: "User",
+      },
+    ],
+
+    locations: [
+      {
+        type: {
+          type: String,
+          default: "Point",
+          enum: ["Point"],
+        },
+        coordinates: [Number], // [longitude, latitude]
+        address: String,
+        description: String,
+        day: Number,
+      },
+    ],
+
+    startLocation: {
+      type: {
+        type: String,
+        default: "Point",
+        enum: ["Point"],
+      },
+      coordinates: [Number],
+      address: String,
+      description: String,
+    },
   },
   {
     toJSON: { virtuals: true },
@@ -103,14 +136,40 @@ const tourSchema = new mongoose.Schema(
 tourSchema.virtual("durationWeeks").get(function () {
   return this.duration / 7;
 });
+// Virtual Populate
+tourSchema.virtual("reviews", {
+  ref: "Review",
+  foreignField: "tour",
+  localField: "_id",
+});
 
-// Document middleware: runs before .save() and .create()
+//tourSchema .index ({})
+tourSchema.index({ startLocation: "2dsphere" });
+
+// DOCUMENT MIDDLEWARE: before saving a document
 tourSchema.pre("save", function (next) {
   this.slug = slugify(this.name, { lower: true });
   next();
 });
 
-// Query middleware: filters out secret tours
+// // Convert guide IDs to actual user documents (embedding pattern)
+// tourSchema.pre("save", async function (next) {
+//   if (!this.guides || this.guides.length === 0) return next();
+
+//   // Sanitize and validate guide IDs
+//   this.guides = this.guides
+//     .map((id) => id.toString().trim())
+//     .filter((id) => mongoose.Types.ObjectId.isValid(id));
+
+//   const guideDocs = await Promise.all(
+//     this.guides.map((id) => User.findById(id))
+//   );
+//   this.guides = guideDocs.filter(Boolean); // remove nulls if any ID was invalid
+
+//   next();
+// });
+
+// QUERY MIDDLEWARE: remove secret tours from any find query
 tourSchema.pre(/^find/, function (next) {
   this.find({ secretTour: { $ne: true } });
   this.start = Date.now();
@@ -118,16 +177,17 @@ tourSchema.pre(/^find/, function (next) {
 });
 
 tourSchema.post(/^find/, function (docs, next) {
-  console.log(`Query took ${Date.now() - this.start} milliseconds!`);
+  console.log(`Query took ${Date.now() - this.start} milliseconds`);
   next();
 });
 
-// Aggregation middleware: exclude secret tours from aggregations
-tourSchema.pre("aggregate", function (next) {
-  this.pipeline().unshift({ $match: { secretTour: { $ne: true } } });
-  console.log(this.pipeline());
-  next();
-});
+// // AGGREGATION MIDDLEWARE: remove secret tours from aggregation
+// tourSchema.pre("aggregate", function (next) {
+//   if (!this.pipeline()[0]?.$match?.secretTour) {
+//     this.pipeline().unshift({ $match: { secretTour: { $ne: true } } });
+//   }
+//   next();
+// });
 
 const Tour = mongoose.model("Tour", tourSchema);
 

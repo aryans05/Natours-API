@@ -56,7 +56,7 @@ userSchema.pre("save", async function (next) {
   next();
 });
 
-// ⏰ Update passwordChangedAt when password is changed
+// // ⏰ Update passwordChangedAt when password is changed
 userSchema.pre("save", function (next) {
   if (!this.isModified("password") || this.isNew) return next();
 
